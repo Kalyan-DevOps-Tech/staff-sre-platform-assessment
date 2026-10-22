@@ -14,4 +14,8 @@ jobs:
         with: { python-version: '3.12' }
       - run: pip install -r services/sample-api/requirements.txt -r services/ai-sre-agent/requirements.txt pytest
       - run: pytest -q
-      - run: python -m compileall -q services
+      - run: python -m compileall -q services scripts
+      - run: python scripts/validate_repo.py
+      - run: docker build -t assessment/sample-api:ci services/sample-api
+      - run: docker build -t assessment/ai-sre-agent:ci services/ai-sre-agent
+      - run: docker build -t assessment/temporal-worker:ci services/temporal-worker

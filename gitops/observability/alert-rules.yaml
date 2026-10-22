@@ -9,6 +9,15 @@ spec:
     - name: sample-api.slo
       interval: 30s
       rules:
+        - record: sample_api:success_ratio:rate5m
+          expr: sum(rate(http_server_requests_total{namespace="apps",status_code!~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_total{namespace="apps"}[5m])), 0.001)
+        - alert: SampleAPISLOBurnShortWindow
+          expr: (sample_api:success_ratio:rate5m < 0.99) and (sum(rate(http_server_requests_total{namespace="apps"}[5m])) > 0.1)
+          for: 5m
+          labels: { severity: warning, service: sample-api }
+          annotations:
+            summary: Sample API success ratio is below the illustrative 99% SLO
+            description: Short-window signal only; confirm traffic volume and review the longer SLO window before declaring an SLO breach.
         - alert: SampleAPIHigh5xxRate
           expr: sum(rate(http_server_requests_total{namespace="apps",status_code=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_total{namespace="apps"}[5m])), 0.001) > 0.05
           for: 2m
