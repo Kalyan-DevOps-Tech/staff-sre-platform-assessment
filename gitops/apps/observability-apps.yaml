@@ -37,7 +37,7 @@ spec:
           prometheus:
             monitor:
               selectorOverride:
-                app.kubernetes.io/instance: platform
+                app.kubernetes.io/instance: kube-prometheus-stack
                 app.kubernetes.io/name: kube-state-metrics
   destination:
     server: https://kubernetes.default.svc
