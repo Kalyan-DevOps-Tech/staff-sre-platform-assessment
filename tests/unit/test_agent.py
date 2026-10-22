@@ -13,3 +13,51 @@ def test_rejects_invalid_window():
         now=int(time.time())
         response=client.post("/analyze",json={"start_unix":now,"end_unix":now-1})
         assert response.status_code==400
+
+def test_detects_5xx_from_loki_when_prometheus_results_are_empty():
+    req = module.IncidentRequest(
+        incident_id="test-loki-5xx",
+        service="sample-api-assessment",
+        start_unix=100,
+        end_unix=200,
+    )
+
+    evidence = {
+        "prometheus_latency_bucket": {
+            "status": "success",
+            "data": {"result": []},
+        },
+        "prometheus_error_rate": {
+            "status": "success",
+            "data": {"result": []},
+        },
+        "loki_logs": {
+            "status": "success",
+            "data": {
+                "result": [
+                    {
+                        "stream": {"pod": "sample-api-assessment-test"},
+                        "values": [
+                            [
+                                "150000000000",
+                                '{"status_code":500,"path":"/api/work"}',
+                            ],
+                            [
+                                "160000000000",
+                                '{"status_code":200,"path":"/health"}',
+                            ],
+                        ],
+                    }
+                ]
+            },
+        },
+        "tempo_trace": {"status": "not_queried"},
+    }
+
+    report = module.deterministic_analysis(req, evidence)
+
+    assert report["observations"]["nonzero_5xx_rate_observed"] is True
+    assert report["observations"]["matching_log_entries"] == 2
+    assert "1 HTTP 5xx" in report["summary"]
+    assert report["confidence"] == "medium"
+    assert "underlying cause is not yet established" in report["likely_root_cause"]

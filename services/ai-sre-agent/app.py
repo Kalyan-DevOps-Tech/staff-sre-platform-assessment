@@ -86,18 +86,51 @@ def deterministic_analysis(req, evidence):
     err_result=[]
     try: err_result=errors.get("data",{}).get("result",[])
     except Exception: pass
-    observed_error=False
+    observed_error = False
     for series in err_result:
-        samples = series.get("values", []) or ([series.get("value")] if series.get("value") else [])
+        samples = series.get("values", []) or (
+            [series["value"]] if series.get("value") else []
+        )
         for sample in samples:
             try:
-                if float(sample[1]) > 0: observed_error=True
+                if float(sample[1]) > 0:
+                    observed_error = True
             except (TypeError, ValueError, IndexError):
                 continue
-    log_count=0
-    try: log_count=sum(len(s.get("values",[])) for s in loki.get("data",{}).get("result",[]))
-    except Exception: pass
-    if observed_error: summary="Prometheus reports a non-zero 5xx rate; investigate the matching API error logs and traces."; cause="Elevated HTTP 5xx responses are observed; the underlying cause is not confirmed by metrics alone."; confidence="medium"
+
+    log_count = 0
+    log_5xx_count = 0
+    try:
+        for stream in loki.get("data", {}).get("result", []):
+            for entry in stream.get("values", []):
+                log_count += 1
+                try:
+                    record = json.loads(entry[1])
+                    status_code = int(record.get("status_code", 0))
+                    if 500 <= status_code <= 599:
+                        log_5xx_count += 1
+                except (TypeError, ValueError, IndexError, json.JSONDecodeError):
+                    continue
+    except (TypeError, AttributeError):
+        pass
+
+    # Log-confirmed 5xx responses remain evidence if Prometheus rate data is empty.
+    observed_error = observed_error or log_5xx_count > 0
+
+    if observed_error and log_5xx_count:
+        summary = (
+            f"Loki confirms {log_5xx_count} HTTP 5xx responses during the incident window; "
+            "correlate with Prometheus metrics and traces to establish the cause."
+        )
+        cause = (
+            "HTTP 5xx responses are confirmed by application logs; "
+            "the underlying cause is not yet established."
+        )
+        confidence = "medium"
+    elif observed_error:
+        summary = "Prometheus reports a non-zero 5xx rate; inspect matching application logs and traces."
+        cause = "Elevated HTTP 5xx responses are observed; the underlying cause is not confirmed."
+        confidence = "medium"
     elif log_count: summary="Application request logs were returned for the incident window; correlate latency histograms and traces before confirming a cause."; cause="Request activity is observed, but the available evidence does not prove a unique root cause."; confidence="low"
     else: summary="Insufficient evidence to confirm a root cause. Verify telemetry ingestion, service labels, and incident time window."; cause="Unknown: required evidence is missing or does not show a clear failure signature."; confidence="low"
     return {"incident_id":req.incident_id,"service":req.service,"summary":summary,"impact":"Not independently measured; use request/error metrics and business telemetry to quantify impact.","window":{"start_unix":req.start_unix,"end_unix":req.end_unix},"observations":{"prometheus_query_succeeded":latency_ok and errors_ok,"loki_query_succeeded":loki_ok,"matching_log_entries":log_count,"nonzero_5xx_rate_observed":observed_error,"trace_requested":bool(req.trace_id),"trace_evidence":evidence.get("tempo_trace")},"likely_root_cause":cause,"alternative_hypotheses":["application dependency latency","resource throttling or saturation","recent release/configuration change","telemetry query or label mismatch"],"confidence":confidence,"evidence":evidence,"recommended_mitigation":["Check recent deployments and configuration changes.","Correlate p95/p99 latency with 5xx rate, pod restarts, and resource throttling.","Inspect matching logs and trace spans before taking action."],"verification_steps":["Repeat a health check and representative request.","Confirm the 5xx rate returns to baseline and latency recovers.","Confirm the alert resolves and retain the report."],"preventive_actions":["Add service-specific latency and error-rate SLOs.","Ensure logs carry request_id and trace_id.","Test rollback and recovery procedures."],"evidence_gaps":[name for name,ok in [("Prometheus latency/error queries",latency_ok and errors_ok),("Loki logs",loki_ok)] if not ok],"mode":"deterministic"}
