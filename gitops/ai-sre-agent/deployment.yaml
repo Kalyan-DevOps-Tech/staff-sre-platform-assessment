@@ -24,7 +24,7 @@ spec:
           env:
             - { name: PROMETHEUS_URL, value: http://platform-kube-prometheus-s-prometheus.observability.svc.cluster.local:9090 }
             - { name: LOKI_URL, value: http://loki.observability.svc.cluster.local:3100 }
-            - { name: TEMPO_URL, value: http://tempo.observability.svc.cluster.local:3200 }
+            - { name: TEMPO_URL, value: http://tempo.observability.svc.cluster.local:3100 }
             - { name: OPENAI_MODEL, value: gpt-4.1-mini }
             - { name: OPENAI_API_KEY, valueFrom: { secretKeyRef: { name: ai-sre-agent-secrets, key: openai-api-key, optional: true } } }
           securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
