@@ -10,7 +10,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: worker
-          image: ghcr.io/kalyan-devops-tech/temporal-worker:0.1.0 # Build/publish and pin digest before deployment
+          image: ghcr.io/kalyan-devops-tech/temporal-worker:0.1.1 # Build/publish and pin digest before deployment
           env:
             - { name: TEMPORAL_ADDRESS, value: temporal-frontend.platform.svc.cluster.local:7233 }
             - { name: AI_SRE_AGENT_URL, value: http://ai-sre-agent.apps.svc.cluster.local:8081 }

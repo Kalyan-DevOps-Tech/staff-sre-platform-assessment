@@ -1,8 +1,11 @@
 """Temporal worker: a durable workflow that calls the read-only AI SRE analyzer."""
 import asyncio, os
 from datetime import timedelta
-import httpx
 from temporalio import activity, workflow
+
+# httpx is used by the activity, not by workflow execution.
+with workflow.unsafe.imports_passed_through():
+    import httpx
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
 from temporalio.worker import Worker
