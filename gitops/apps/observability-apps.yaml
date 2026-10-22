@@ -29,6 +29,12 @@ spec:
             type: ClusterIP
         nodeExporter:
           enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeControllerManager:
+          enabled: false
+        kubeProxy:
+          enabled: false
         prometheus:
           prometheusSpec:
             retention: 3d
