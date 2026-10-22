@@ -49,15 +49,21 @@ app = FastAPI(title="SRE Assessment Sample API", version="1.0.0", lifespan=lifes
 @app.middleware("http")
 async def observe_request(request: Request, call_next):
     request_id = request.headers.get("x-request-id", str(uuid.uuid4()))[:128]
-    started = time.perf_counter(); status = 500; route = request.url.path
+    started = time.perf_counter(); status = 500; route = "unmatched"
     with TRACER.start_as_current_span("http.request") as span:
-        span.set_attribute("http.request.method", request.method); span.set_attribute("http.route", route)
+        span.set_attribute("http.request.method", request.method); span.set_attribute("request.id", request_id)
         try:
             response = await call_next(request); status = response.status_code
+            matched_route = request.scope.get("route")
+            route = getattr(matched_route, "path", "unmatched")
+            span.set_attribute("http.route", route)
             response.headers["x-request-id"] = request_id
             response.headers["x-trace-id"] = format(span.get_span_context().trace_id, "032x") if span.get_span_context().is_valid else ""
             return response
         except Exception:
+            matched_route = request.scope.get("route")
+            route = getattr(matched_route, "path", "unmatched")
+            span.set_attribute("http.route", route)
             LOG.exception("request_failed", extra={"request_id":request_id,"path":route})
             raise
         finally:
