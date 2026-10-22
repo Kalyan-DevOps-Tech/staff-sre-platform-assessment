@@ -21,6 +21,8 @@ spec:
             passwordKey: admin-password
           service:
             type: ClusterIP
+        prometheus-node-exporter:
+          enabled: false
         prometheus:
           prometheusSpec:
             retention: 3d
@@ -33,7 +35,9 @@ spec:
     namespace: observability
   syncPolicy:
     automated: { selfHeal: true, prune: false }
-    syncOptions: [CreateNamespace=true]
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -80,6 +84,10 @@ spec:
           resources:
             requests: { cpu: 100m, memory: 256Mi }
             limits: { cpu: 500m, memory: 768Mi }
+        chunksCache:
+          enabled: false
+        resultsCache:
+          enabled: false
         backend: { replicas: 0 }
         read: { replicas: 0 }
         write: { replicas: 0 }
