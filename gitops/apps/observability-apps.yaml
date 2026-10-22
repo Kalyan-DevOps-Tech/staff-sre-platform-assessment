@@ -1,0 +1,171 @@
+# Upstream Helm charts are reconciled by Argo CD. Pin chart versions before final submission.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 69.8.2
+    helm:
+      releaseName: platform
+      values: |
+        grafana:
+          enabled: true
+          admin:
+            existingSecret: grafana-admin-credentials
+            userKey: admin-user
+            passwordKey: admin-password
+          service:
+            type: ClusterIP
+        prometheus:
+          prometheusSpec:
+            retention: 3d
+            resources:
+              requests: { cpu: 250m, memory: 512Mi }
+              limits: { cpu: "1", memory: 2Gi }
+            additionalScrapeConfigs: []
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated: { selfHeal: true, prune: false }
+    syncOptions: [CreateNamespace=true]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    targetRevision: 6.29.0
+    helm:
+      releaseName: loki
+      values: |
+        deploymentMode: SingleBinary
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          storage:
+            type: filesystem
+          schemaConfig:
+            configs:
+              - from: "2024-04-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+          limits_config:
+            retention_period: 72h
+        singleBinary:
+          replicas: 1
+          persistence:
+            enabled: false
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: 500m, memory: 768Mi }
+        backend: { replicas: 0 }
+        read: { replicas: 0 }
+        write: { replicas: 0 }
+        gateway: { enabled: false }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated: { selfHeal: true, prune: false }
+    syncOptions: [CreateNamespace=true]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tempo
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: tempo
+    targetRevision: 1.18.1
+    helm:
+      releaseName: tempo
+      values: |
+        tempo:
+          receivers:
+            otlp:
+              protocols:
+                grpc: { endpoint: 0.0.0.0:4317 }
+                http: { endpoint: 0.0.0.0:4318 }
+          storage:
+            trace:
+              backend: local
+              local:
+                path: /var/tempo/traces
+        persistence:
+          enabled: false
+        resources:
+          requests: { cpu: 100m, memory: 256Mi }
+          limits: { cpu: 500m, memory: 768Mi }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated: { selfHeal: true, prune: false }
+    syncOptions: [CreateNamespace=true]
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana-alloy
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: alloy
+    targetRevision: 0.12.6
+    helm:
+      releaseName: alloy
+      values: |
+        controller:
+          type: daemonset
+        alloy:
+          configMap:
+            create: true
+            content: |
+              discovery.kubernetes "pods" { role = "pod" }
+              discovery.relabel "pods" {
+                targets = discovery.kubernetes.pods.targets
+                rule { source_labels = ["__meta_kubernetes_namespace"] target_label = "namespace" }
+                rule { source_labels = ["__meta_kubernetes_pod_name"] target_label = "pod" }
+                rule { source_labels = ["__meta_kubernetes_pod_container_name"] target_label = "container" }
+              }
+              loki.source.kubernetes "pods" {
+                targets = discovery.relabel.pods.output
+                forward_to = [loki.process.pods.receiver]
+              }
+              loki.process "pods" {
+                stage.cri {}
+                forward_to = [loki.write.local.receiver]
+              }
+              loki.write "local" {
+                endpoint {
+                  url = "http://loki.observability.svc.cluster.local:3100/loki/api/v1/push"
+                }
+              }
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated: { selfHeal: true, prune: false }
+    syncOptions: [CreateNamespace=true]

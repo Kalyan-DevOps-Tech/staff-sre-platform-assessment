@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: sample-api-slo-alerts
+  namespace: observability
+  labels: { release: platform }
+spec:
+  groups:
+    - name: sample-api.slo
+      interval: 30s
+      rules:
+        - alert: SampleAPIHigh5xxRate
+          expr: sum(rate(http_server_requests_total{namespace="apps",status_code=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_total{namespace="apps"}[5m])), 0.001) > 0.05
+          for: 2m
+          labels: { severity: warning, service: sample-api }
+          annotations:
+            summary: Sample API 5xx ratio exceeds 5%
+            description: Check API logs, traces, recent releases, and resource pressure.
+        - alert: SampleAPITargetDown
+          expr: up{namespace="apps",service="sample-api"} == 0
+          for: 2m
+          labels: { severity: critical, service: sample-api }
+          annotations:
+            summary: Sample API metrics target is down
+            description: Verify service endpoints, pod readiness, and scrape configuration.

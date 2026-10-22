@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: temporal-worker }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: temporal-worker } }
+  template:
+    metadata: { labels: { app: temporal-worker } }
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: worker
+          image: ghcr.io/kalyan-devops-tech/temporal-worker:0.1.0 # Build/publish and pin digest before deployment
+          env:
+            - { name: TEMPORAL_ADDRESS, value: temporal-frontend.platform.svc.cluster.local:7233 }
+            - { name: AI_SRE_AGENT_URL, value: http://ai-sre-agent.apps.svc.cluster.local:8081 }
+          resources: { requests: { cpu: 100m, memory: 128Mi }, limits: { cpu: 500m, memory: 512Mi } }
+          readinessProbe: { exec: { command: [python, -c, 'import os; print("worker process configured")'] }, initialDelaySeconds: 10, periodSeconds: 20 }

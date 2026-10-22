@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: ai-sre-agent-egress }
+spec:
+  podSelector: { matchLabels: { app.kubernetes.io/name: ai-sre-agent } }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: platform } } }]
+      ports: [{ protocol: TCP, port: 8081 }]
+  egress:
+    - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: observability } } }]
+      ports: [{ protocol: TCP, port: 9090 }, { protocol: TCP, port: 3100 }, { protocol: TCP, port: 3200 }]
+    - to: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } } }]
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    # Optional external LLM egress must be explicitly enabled and restricted by a production egress gateway/policy.
