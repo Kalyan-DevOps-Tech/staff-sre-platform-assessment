@@ -2,7 +2,7 @@
 
 A local, GitOps-managed SRE platform reference implementation for the Intuitive Technology Partners Staff Infrastructure & SRE assessment. It combines k3s, Argo CD, Prometheus, Grafana, Loki, Tempo, an instrumented FastAPI service, Temporal, and a telemetry-backed AI SRE investigator.
 
-> **Status:** implementation scaffold; local cluster bootstrap and end-to-end execution must be verified on your machine. This repository does not claim a successful cluster run until `scripts/validate.sh` and the incident drill have been executed.
+> **Status:** The AI SRE agent enhancement, automated tests, image deployment, and controlled incident simulation have been validated locally. These checks do not establish a completed clean-room bootstrap, production-scale reliability, or full end-to-end trace correlation.
 
 ## Architecture
 
@@ -33,6 +33,7 @@ flowchart LR
 - `services/temporal-worker/`: Temporal workflow and activity worker.
 - `tests/`: unit tests for the API and RCA logic.
 - `scripts/`: bootstrap, validation, and controlled incident drill.
+- `artifacts/`: generated incident RCA JSON reports.
 
 ## Prerequisites
 
@@ -61,6 +62,35 @@ pytest -q
 ```
 
 Build and publish images with `scripts/build-push-images.sh`. First authenticate to GHCR interactively or with a short-lived token via `docker login ghcr.io`; never place the token in Git. Set `REGISTRY` and `TAG` if needed. Update image references in GitOps manifests to the actual published images and preferably immutable digests before syncing. Do not use `latest` for a reviewed release.
+
+### Recent implementation and validation
+
+#### AI SRE agent: log-based HTTP 5xx detection
+
+The deterministic incident analysis pipeline was enhanced to inspect structured Loki application logs for HTTP status codes in the 500–599 range. This supplements Prometheus error-rate evidence and helps the agent recognize application errors when metric evidence is missing or incomplete.
+
+When HTTP 5xx responses are found in logs, the RCA report identifies that evidence and distinguishes observed errors from an underlying root cause that has not yet been established.
+
+#### Deployment
+
+- **Container image:** `ghcr.io/kalyan-devops-tech/ai-sre-agent:0.1.3`
+- **Image digest:** `sha256:1410e6abbcb5492e9cf09d401c7f595470c0061bda0380a97909b9ba4b1b3644`
+- **Deployment management:** Argo CD and GitOps
+- **Health validation:** passed for the configured Prometheus, Loki, and Tempo integrations.
+
+The image is pinned by digest in `gitops/ai-sre-agent/deployment.yaml`.
+
+#### Validation results
+
+- Unit tests: **7 passed**.
+- `git diff --check`: passed.
+- Controlled incident simulation against `sample-api-assessment`: completed successfully.
+- Loki evidence: **5 HTTP 5xx responses** identified in the generated RCA report.
+- Fault injection: reset successfully after the simulation.
+
+The validated report assigned medium confidence and stated that the underlying cause was not yet established. Tempo trace evidence was not queried during this simulation.
+
+These results validate the tested behavior; they do not establish production-scale reliability, a completed clean-room bootstrap, or successful trace correlation for every incident.
 
 ## Incident drill
 
@@ -108,6 +138,7 @@ The API exports request count and latency histograms. `gitops/observability/` co
 - Chart versions and images must be reviewed and pinned before final submission.
 - The Temporal local deployment uses PostgreSQL as its persistence store; validate schema initialization and workflow execution after bootstrap.
 - LLM output is advisory and must be grounded in query evidence. If no LLM key is configured, the agent uses a deterministic rules-based fallback.
+- RCA confidence is evidence-dependent. Correlate metrics, logs, traces, and recent changes before treating a suggested hypothesis as a confirmed root cause.
 
 ## Day-2 runbooks
 
