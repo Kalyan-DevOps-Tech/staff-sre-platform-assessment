@@ -1,0 +1,28 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alertmanager-restart-alert
+  namespace: observability
+  labels:
+    release: platform
+spec:
+  groups:
+    - name: alertmanager.restart.rules
+      rules:
+        - alert: AlertmanagerContainerRestarting
+          expr: |
+            increase(
+              kube_pod_container_status_restarts_total{
+                namespace="observability",
+                pod=~"alertmanager-platform-kube-prometheus-s-alertmanager-.*",
+                container="alertmanager"
+              }[10m]
+            ) > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Alertmanager container restarted"
+            description: "Alertmanager container {{ $labels.pod }} restarted within the last 10 minutes."
+

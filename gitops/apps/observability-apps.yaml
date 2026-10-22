@@ -16,6 +16,9 @@ spec:
       skipCrds: true
       releaseName: platform
       values: |
+        defaultRules:
+          rules:
+            alertmanager: false
         grafana:
           enabled: true
           admin:
