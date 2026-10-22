@@ -13,6 +13,7 @@ spec:
     chart: kube-prometheus-stack
     targetRevision: 69.8.2
     helm:
+      skipCrds: true
       releaseName: platform
       values: |
         grafana:
