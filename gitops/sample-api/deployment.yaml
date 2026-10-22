@@ -25,7 +25,7 @@ spec:
           env:
             - { name: OTEL_SERVICE_NAME, value: sample-api }
             - { name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, value: http://tempo.observability.svc.cluster.local:4318/v1/traces }
-            - { name: FAULT_INJECTION_ENABLED, value: "true" }
+            - { name: FAULT_INJECTION_ENABLED, value: "false" }
             - { name: FAULT_INJECTION_TOKEN, valueFrom: { secretKeyRef: { name: sample-api-fault-token, key: token, optional: true } } }
           securityContext:
             allowPrivilegeEscalation: false
