@@ -15,3 +15,25 @@ def test_fault_endpoint_disabled_by_default(monkeypatch):
     monkeypatch.setattr(module,"FAULT_ENABLED",False)
     with TestClient(module.app) as client:
         assert client.post("/admin/fault",json={"latency_ms":100}).status_code==404
+def test_http_500_is_recorded_in_prometheus_metrics(monkeypatch):
+    monkeypatch.setattr(module, "FAULT_ENABLED", True)
+    monkeypatch.setattr(module, "FAULT_TOKEN", "test-token")
+    monkeypatch.setitem(module.FAULT_STATE, "latency_ms", 0)
+    monkeypatch.setitem(module.FAULT_STATE, "error_rate", 1.0)
+
+    with TestClient(module.app) as client:
+        response = client.post(
+            "/admin/fault",
+            json={"latency_ms": 0, "error_rate": 1.0},
+            headers={"x-fault-token": "test-token"},
+        )
+        assert response.status_code == 200
+
+        response = client.get("/api/work")
+        assert response.status_code == 500
+
+        metrics = client.get("/metrics").text
+        assert 'http_server_requests_total{method="GET",route="/api/work",status_code="500"}' in metrics
+
+    monkeypatch.setitem(module.FAULT_STATE, "latency_ms", 0)
+    monkeypatch.setitem(module.FAULT_STATE, "error_rate", 0.0)
