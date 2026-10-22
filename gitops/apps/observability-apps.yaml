@@ -33,6 +33,12 @@ spec:
               requests: { cpu: 250m, memory: 512Mi }
               limits: { cpu: "1", memory: 2Gi }
             additionalScrapeConfigs: []
+        kube-state-metrics:
+          prometheus:
+            monitor:
+              selectorOverride:
+                app.kubernetes.io/instance: platform
+                app.kubernetes.io/name: kube-state-metrics
   destination:
     server: https://kubernetes.default.svc
     namespace: observability
