@@ -19,7 +19,7 @@ spec:
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: agent
-          image: ghcr.io/kalyan-devops-tech/ai-sre-agent:0.1.2@sha256:9325fa2ade7bbc7e2cdeb76a2789a8548e5e1cc25f4a4267e904f3a6a1299ca2 # Build/publish and pin digest before deployment
+          image: ghcr.io/kalyan-devops-tech/ai-sre-agent:0.1.3@sha256:1410e6abbcb5492e9cf09d401c7f595470c0061bda0380a97909b9ba4b1b3644 # Build/publish and pin digest before deployment
           ports: [{ name: http, containerPort: 8081 }]
           env:
             - { name: PROMETHEUS_URL, value: http://platform-kube-prometheus-s-prometheus.observability.svc.cluster.local:9090 }
