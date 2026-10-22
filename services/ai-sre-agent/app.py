@@ -25,8 +25,8 @@ async def get_json(client, url, params=None):
 async def gather_evidence(req: IncidentRequest):
     if req.end_unix < req.start_unix or req.end_unix-req.start_unix > 3600: raise HTTPException(400,"invalid time range: end must be after start and window <= 1 hour")
     async with httpx.AsyncClient() as client:
-        prom=await get_json(client, PROM_URL.rstrip("/")+"/api/v1/query_range", {"query":'histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))',"start":str(req.start_unix),"end":str(req.end_unix),"step":"15s"})
-        prom_error=await get_json(client, PROM_URL.rstrip("/")+"/api/v1/query_range", {"query":'sum(rate(http_server_requests_total{status_code=~"5.."}[5m]))',"start":str(req.start_unix),"end":str(req.end_unix),"step":"15s"})
+        prom=await get_json(client, PROM_URL.rstrip("/")+"/api/v1/query_range", {"query":'histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job="sample-api"}[5m])))',"start":str(req.start_unix),"end":str(req.end_unix),"step":"15s"})
+        prom_error=await get_json(client, PROM_URL.rstrip("/")+"/api/v1/query_range", {"query":'sum(rate(http_server_requests_total{job="sample-api",status_code=~"5.."}[5m])) or (sum(rate(http_server_requests_total{job="sample-api"}[5m])) * 0)',"start":str(req.start_unix),"end":str(req.end_unix),"step":"15s"})
         # Loki query is bounded to the supplied incident window; escape label values by using a fixed selector.
         loki=await get_json(client, LOKI_URL.rstrip("/")+"/loki/api/v1/query_range", {"query":'{namespace="apps"} |= "request_completed"',"start":str(req.start_unix*1_000_000_000),"end":str(req.end_unix*1_000_000_000),"limit":"100"})
         trace_result={"status":"not_queried","reason":"provide trace_id for direct lookup; broad trace search depends on Tempo configuration"}
@@ -36,7 +36,7 @@ async def gather_evidence(req: IncidentRequest):
 
 def deterministic_analysis(req, evidence):
     errors=evidence.get("prometheus_error_rate",{}); loki=evidence.get("loki_logs",{}); latency=evidence.get("prometheus_latency_bucket",{})
-    errors_ok=errors.get("status")=="success"; loki_ok=not loki.get("query_error"); latency_ok=latency.get("status")=="success"
+    errors_ok=errors.get("status")=="success" and any(s.get("values") for s in errors.get("data",{}).get("result",[])); loki_ok=not loki.get("query_error"); latency_ok=latency.get("status")=="success" and bool(latency.get("data",{}).get("result"))
     err_result=[]
     try: err_result=errors.get("data",{}).get("result",[])
     except Exception: pass
