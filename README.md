@@ -33,7 +33,6 @@ flowchart LR
 - `services/temporal-worker/`: Temporal workflow and activity worker.
 - `tests/`: unit tests for the API and RCA logic.
 - `scripts/`: bootstrap, validation, and controlled incident drill.
-- `AI_INTERACTION_LOG.md`: development interaction log; append actual sessions and preserve full transcripts separately as required.
 
 ## Prerequisites
 
@@ -123,7 +122,3 @@ See `docs/operations.md`, `docs/security.md`, and `docs/incident-runbook.md`.
 5. Add Temporal persistence/restore drills and documented backup retention.
 6. Load-test the API and derive resource requests from observed usage.
 7. Port the design to EKS with IRSA, multi-AZ node groups, managed secrets, encrypted persistent storage, and an approved DR plan.
-
-## AI usage disclosure
-
-The assessment requires a complete AI interaction log. `AI_INTERACTION_LOG.md` contains a starter index and must be updated with the actual tools, prompts, outputs, and decisions used during development. Do not claim a transcript is complete unless it is actually captured. Redact secrets and personal data.
