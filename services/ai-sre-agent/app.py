@@ -1,5 +1,5 @@
 """Read-only observability investigator with deterministic and optional LLM summarization."""
-import os, time, uuid, json
+import os, time, uuid, json, re
 from typing import Any
 import httpx
 from fastapi import FastAPI, HTTPException
@@ -25,10 +25,56 @@ async def get_json(client, url, params=None):
 async def gather_evidence(req: IncidentRequest):
     if req.end_unix < req.start_unix or req.end_unix-req.start_unix > 3600: raise HTTPException(400,"invalid time range: end must be after start and window <= 1 hour")
     async with httpx.AsyncClient() as client:
-        prom=await get_json(client, PROM_URL.rstrip("/")+"/api/v1/query_range", {"query":'histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{job="sample-api"}[5m])))',"start":str(req.start_unix),"end":str(req.end_unix),"step":"15s"})
-        prom_error=await get_json(client, PROM_URL.rstrip("/")+"/api/v1/query_range", {"query":'sum(rate(http_server_requests_total{job="sample-api",status_code=~"5.."}[5m])) or (sum(rate(http_server_requests_total{job="sample-api"}[5m])) * 0)',"start":str(req.start_unix),"end":str(req.end_unix),"step":"15s"})
+        if not re.fullmatch(r"[a-zA-Z0-9_-]{1,100}", req.service):
+            raise HTTPException(400, "invalid service name")
+
+        job = req.service
+
+        latency_query = (
+            'histogram_quantile(0.95, '
+            'sum by (le) (rate('
+            f'http_server_request_duration_seconds_bucket{{job="{job}"}}[5m])))'
+        )
+        error_query = (
+            'sum(rate(http_server_requests_total'
+            f'{{job="{job}",status_code=~"5.."}}[5m])) or '
+            '(sum(rate(http_server_requests_total'
+            f'{{job="{job}"}}[5m])) * 0)'
+        )
+
+        prom = await get_json(
+            client,
+            PROM_URL.rstrip("/") + "/api/v1/query_range",
+            {
+                "query": latency_query,
+                "start": str(req.start_unix),
+                "end": str(req.end_unix),
+                "step": "15s",
+            },
+        )
+        prom_error = await get_json(
+            client,
+            PROM_URL.rstrip("/") + "/api/v1/query_range",
+            {
+                "query": error_query,
+                "start": str(req.start_unix),
+                "end": str(req.end_unix),
+                "step": "15s",
+            },
+        )
+
         # Loki query is bounded to the supplied incident window; escape label values by using a fixed selector.
-        loki=await get_json(client, LOKI_URL.rstrip("/")+"/loki/api/v1/query_range", {"query":'{namespace="apps"} |= "request_completed"',"start":str(req.start_unix*1_000_000_000),"end":str(req.end_unix*1_000_000_000),"limit":"100"})
+        loki_query = '{namespace="apps", pod=~"sample-api-assessment-.*"} |= "request_completed"'
+        loki = await get_json(
+            client,
+            LOKI_URL.rstrip("/") + "/loki/api/v1/query_range",
+            {
+                "query": loki_query,
+                "start": str(req.start_unix * 1_000_000_000),
+                "end": str(req.end_unix * 1_000_000_000),
+                "limit": "100",
+            },
+        )
         trace_result={"status":"not_queried","reason":"provide trace_id for direct lookup; broad trace search depends on Tempo configuration"}
         if req.trace_id:
             trace_result=await get_json(client,TEMPO_URL.rstrip("/")+f"/api/traces/{req.trace_id}")

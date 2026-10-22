@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-api-assessment
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: sample-api-assessment
+spec:
+  selector:
+    app.kubernetes.io/name: sample-api-assessment
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
