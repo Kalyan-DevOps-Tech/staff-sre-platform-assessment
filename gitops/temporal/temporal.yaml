@@ -24,7 +24,7 @@ spec:
             - { name: POSTGRES_SEEDS, value: temporal-postgres.platform.svc.cluster.local }
             - { name: POSTGRES_USER, value: temporal }
             - { name: POSTGRES_PWD, valueFrom: { secretKeyRef: { name: temporal-db, key: password } } }
-            - { name: DYNAMIC_CONFIG_FILE_PATH, value: config/dynamicconfig/development.yaml }
+            - { name: DYNAMIC_CONFIG_FILE_PATH, value: config/dynamicconfig/docker.yaml }
           ports: [{ containerPort: 7233 }]
           resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { cpu: "1", memory: 1Gi } }
           readinessProbe: { tcpSocket: { port: 7233 }, initialDelaySeconds: 30, periodSeconds: 10 }
